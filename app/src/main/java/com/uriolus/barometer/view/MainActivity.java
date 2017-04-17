@@ -17,14 +17,16 @@ import com.uriolus.barometer.utils.BoardDefaults;
 import com.uriolus.barometer.utils.NetUtils;
 
 import java.io.IOException;
+import java.util.List;
 
 
 public class MainActivity extends AppCompatActivity implements SensorEventListener {
     private TextView textIp;
-    private TextView tvTemperature, tvPressure;
+    private TextView tvTemperature, tvPressure, tvAltitude;
     private static final String TAG = MainActivity.class.getSimpleName();
     private Bmx280SensorDriver bmx280SensorDriver;
     private SensorManager mSensorManager;
+    Sensor temperature,pressure;
     private DynamicSensorCallback mDynamicSensorCallback;
 
     @Override
@@ -55,22 +57,46 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     private void registerSensors() {
         // Register the BMP280 temperature sensor
-        Sensor temperature = mSensorManager
-                .getDynamicSensorList(Sensor.TYPE_AMBIENT_TEMPERATURE).get(0);
-        mSensorManager.registerListener(this, temperature,
-                SensorManager.SENSOR_DELAY_NORMAL);
-        // Register the BMP280 pressure sensor
-        Sensor pressure = mSensorManager
-                .getDynamicSensorList(Sensor.TYPE_PRESSURE).get(0);
-        mSensorManager.registerListener(this, pressure,
+        mSensorManager.registerDynamicSensorCallback(new DynamicSensorCallback() {
+            @Override
+            public void onDynamicSensorConnected(Sensor sensor) {
+                super.onDynamicSensorConnected(sensor);
+                Log.w(TAG,"New sensor connected:"+sensor.getName());
+                registerSensor(sensor);
+            }
+
+            @Override
+            public void onDynamicSensorDisconnected(Sensor sensor) {
+                super.onDynamicSensorDisconnected(sensor);
+            }
+        });
+        List<Sensor> sensorTemperatureList= mSensorManager.getDynamicSensorList(Sensor.TYPE_AMBIENT_TEMPERATURE);
+        if (sensorTemperatureList==null || sensorTemperatureList.size()==0){
+            Log.e(TAG,"No temperature sensors");
+        }else {
+            registerSensor(sensorTemperatureList.get(0));
+        }
+        List<Sensor> sensorPressureList= mSensorManager.getDynamicSensorList(Sensor.TYPE_PRESSURE);
+        if (sensorPressureList==null || sensorPressureList.size()==0){
+            Log.e(TAG,"No presure sensors");
+        }else {
+            // Register the BMP280 pressure sensor
+            registerSensor(sensorPressureList.get(0));
+        }
+    }
+
+    private void registerSensor(Sensor sensor) {
+        mSensorManager.registerListener(this, sensor,
                 SensorManager.SENSOR_DELAY_NORMAL);
     }
+
     @Override
     protected void onStop() {
         super.onStop();
 
         mSensorManager.unregisterListener(this);
     }
+
     @Override
     protected void onResume() {
         super.onResume();
@@ -87,6 +113,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         textIp = (TextView) findViewById(R.id.text_ip);
         tvTemperature = (TextView) findViewById(R.id.tv_temperature);
         tvPressure = (TextView) findViewById(R.id.tv_preasure);
+        tvAltitude = (TextView) findViewById(R.id.tv_altitude);
     }
 
     @Override
@@ -122,6 +149,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         tvPressure.setText(preasure + "?");
     }
 
+    private void publishAltitude(float altitude) {
+        tvAltitude.setText(altitude+"m");
+    }
+
+
     @Override
     public void onSensorChanged(SensorEvent sensorEvent) {
         final float value = sensorEvent.values[0];
@@ -131,8 +163,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         }
         if (sensorEvent.sensor.getType() == Sensor.TYPE_PRESSURE) {
             publishPreasure(value);
+            //float altitude = readAltitude(1013.25f, value);
+            float altitude = SensorManager.getAltitude(1013.25f, value);
+            publishAltitude(altitude);
         }
-
 
 
     }
@@ -141,4 +175,5 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
         Log.i(TAG, "sensor accuracy changed: " + accuracy);
     }
+
 }
