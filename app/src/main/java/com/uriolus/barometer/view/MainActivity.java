@@ -12,10 +12,8 @@ import android.util.Log;
 import android.widget.TextView;
 
 import com.google.android.things.contrib.driver.bmx280.Bmx280SensorDriver;
-import com.google.android.things.pio.PeripheralManagerService;
 import com.uriolus.barometer.R;
 import com.uriolus.barometer.utils.BoardDefaults;
-import com.uriolus.barometer.utils.HardwareUtils;
 import com.uriolus.barometer.utils.NetUtils;
 
 import java.io.IOException;
@@ -23,9 +21,9 @@ import java.io.IOException;
 
 public class MainActivity extends AppCompatActivity implements SensorEventListener {
     private TextView textIp;
-    private TextView tvTemperature;
+    private TextView tvTemperature, tvPressure;
     private static final String TAG = MainActivity.class.getSimpleName();
-    private Bmx280SensorDriver mTemperatureSensorDriver;
+    private Bmx280SensorDriver bmx280SensorDriver;
     private SensorManager mSensorManager;
     private DynamicSensorCallback mDynamicSensorCallback;
 
@@ -34,35 +32,45 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         findViews();
-
         configureHardware();
-
     }
 
     private void configureHardware() {
-
-
-        mDynamicSensorCallback = new SensorManager.DynamicSensorCallback() {
-            @Override
-            public void onDynamicSensorConnected(Sensor sensor) {
-                if (sensor.getType() == Sensor.TYPE_AMBIENT_TEMPERATURE) {
-                    Log.i(TAG, "Temperature sensor connected");
-                    mSensorManager.registerListener(MainActivity.this,
-                            sensor, SensorManager.SENSOR_DELAY_NORMAL);
-                }
-            }
-        };
-        mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-        mSensorManager.registerDynamicSensorCallback(mDynamicSensorCallback);
-
         try {
-            mTemperatureSensorDriver = new Bmx280SensorDriver(BoardDefaults.getI2CPort());
-            mTemperatureSensorDriver.registerTemperatureSensor();
+            bmx280SensorDriver = new Bmx280SensorDriver(BoardDefaults.getI2CPort());
+            bmx280SensorDriver.registerTemperatureSensor();
+            bmx280SensorDriver.registerPressureSensor();
+
         } catch (IOException e) {
             Log.e(TAG, "Error configuring sensor", e);
         }
+        mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
     }
 
+    @Override
+    protected void onStart() {
+        super.onStart();
+        registerSensors();
+    }
+
+    private void registerSensors() {
+        // Register the BMP280 temperature sensor
+        Sensor temperature = mSensorManager
+                .getDynamicSensorList(Sensor.TYPE_AMBIENT_TEMPERATURE).get(0);
+        mSensorManager.registerListener(this, temperature,
+                SensorManager.SENSOR_DELAY_NORMAL);
+        // Register the BMP280 pressure sensor
+        Sensor pressure = mSensorManager
+                .getDynamicSensorList(Sensor.TYPE_PRESSURE).get(0);
+        mSensorManager.registerListener(this, pressure,
+                SensorManager.SENSOR_DELAY_NORMAL);
+    }
+    @Override
+    protected void onStop() {
+        super.onStop();
+
+        mSensorManager.unregisterListener(this);
+    }
     @Override
     protected void onResume() {
         super.onResume();
@@ -70,7 +78,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     }
 
     private void showIp() {
-        //String ip=NetUtils.getIp(this);
+
         String ip = NetUtils.getLocalIpAddress(true);
         textIp.setText(ip);
     }
@@ -78,6 +86,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private void findViews() {
         textIp = (TextView) findViewById(R.id.text_ip);
         tvTemperature = (TextView) findViewById(R.id.tv_temperature);
+        tvPressure = (TextView) findViewById(R.id.tv_preasure);
     }
 
     @Override
@@ -90,25 +99,42 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     private void destroyHardware() {
         Log.i(TAG, "Closing sensor");
-        if (mTemperatureSensorDriver != null) {
-            mSensorManager.unregisterDynamicSensorCallback(mDynamicSensorCallback);
+        if (bmx280SensorDriver != null) {
+
             mSensorManager.unregisterListener(this);
-            mTemperatureSensorDriver.unregisterTemperatureSensor();
+            bmx280SensorDriver.unregisterTemperatureSensor();
+            bmx280SensorDriver.unregisterPressureSensor();
             try {
-                mTemperatureSensorDriver.close();
+                bmx280SensorDriver.close();
             } catch (IOException e) {
                 Log.e(TAG, "Error closing sensor", e);
             } finally {
-                mTemperatureSensorDriver = null;
+                bmx280SensorDriver = null;
             }
         }
     }
-    private void publishTemperature(Float temperature){
-        tvTemperature.setText(temperature+"ºC");
+
+    private void publishTemperature(Float temperature) {
+        tvTemperature.setText(temperature + "ºC");
     }
+
+    private void publishPreasure(Float preasure) {
+        tvPressure.setText(preasure + "?");
+    }
+
     @Override
     public void onSensorChanged(SensorEvent sensorEvent) {
-       publishTemperature( sensorEvent.values[0]);
+        final float value = sensorEvent.values[0];
+
+        if (sensorEvent.sensor.getType() == Sensor.TYPE_AMBIENT_TEMPERATURE) {
+            publishTemperature(value);
+        }
+        if (sensorEvent.sensor.getType() == Sensor.TYPE_PRESSURE) {
+            publishPreasure(value);
+        }
+
+
+
     }
 
     @Override
