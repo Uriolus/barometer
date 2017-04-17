@@ -26,8 +26,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private static final String TAG = MainActivity.class.getSimpleName();
     private Bmx280SensorDriver bmx280SensorDriver;
     private SensorManager mSensorManager;
-    Sensor temperature,pressure;
-    private DynamicSensorCallback mDynamicSensorCallback;
+
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
