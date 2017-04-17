@@ -6,6 +6,7 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.hardware.SensorManager.DynamicSensorCallback;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -15,8 +16,10 @@ import com.google.android.things.contrib.driver.bmx280.Bmx280SensorDriver;
 import com.uriolus.barometer.R;
 import com.uriolus.barometer.utils.BoardDefaults;
 import com.uriolus.barometer.utils.NetUtils;
+import com.uriolus.barometer.view.presenter.DisplayPresenter;
 
 import java.io.IOException;
+import java.text.DecimalFormat;
 import java.util.List;
 
 
@@ -26,13 +29,16 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private static final String TAG = MainActivity.class.getSimpleName();
     private Bmx280SensorDriver bmx280SensorDriver;
     private SensorManager mSensorManager;
-
-
-
+    private DisplayPresenter displayPresenter;
+    private final int everySeconds=2*1000;
+    private long last_time = (long)(System.nanoTime() / 1000000f);
+    private float elapsed=0;
+    DecimalFormat df = new DecimalFormat("0.0");
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        displayPresenter=new DisplayPresenter(this);
         findViews();
         configureHardware();
     }
@@ -47,6 +53,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             Log.e(TAG, "Error configuring sensor", e);
         }
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        displayPresenter.create();
     }
 
     @Override
@@ -101,6 +108,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     protected void onResume() {
         super.onResume();
         showIp();
+
     }
 
     private void showIp() {
@@ -139,12 +147,30 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 bmx280SensorDriver = null;
             }
         }
+        displayPresenter.destroy();
     }
 
     private void publishTemperature(Float temperature) {
-        tvTemperature.setText(temperature + "ºC");
+        tvTemperature.setText(df.format(temperature) + "ºC");
+        if (calculateIfHasToDisplay()) {
+            new AsyncTaskOLED().doInBackground(df.format(temperature) + "ºC");
+        }
+       //displayTextInOLED(df.format(temperature) + "ºC");
     }
 
+    private void displayTextInOLED(String temperature) {
+        displayPresenter.writeText(temperature);
+    }
+    private class AsyncTaskOLED extends AsyncTask<String,Void,Void>{
+
+        @Override
+        protected Void doInBackground(String... strings) {
+            //displayTextInOLED(strings[0]) ;
+
+            displayPresenter.drawTextInstantaneously(strings[0]);
+            return null;
+        }
+    }
     private void publishPreasure(Float preasure) {
         tvPressure.setText(preasure + "?");
     }
@@ -170,7 +196,18 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
 
     }
-
+    private boolean calculateIfHasToDisplay(){
+        long time = (long)(System.nanoTime() / 1000000f);
+        long delta_time =  (time - last_time );
+        last_time = time;
+        elapsed+=delta_time;
+        if (elapsed>everySeconds){
+            elapsed=0;
+            Log.d(TAG,"HAS TO UPDATE");
+            return true;
+        }
+        return false;
+    }
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
         Log.i(TAG, "sensor accuracy changed: " + accuracy);
