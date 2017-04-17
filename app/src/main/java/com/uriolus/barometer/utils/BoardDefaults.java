@@ -11,8 +11,10 @@ import java.util.List;
 public class BoardDefaults {
   private static final String DEVICE_EDISON_ARDUINO = "edison_arduino";
   private static final String DEVICE_EDISON = "edison";
+  private static final String DEVICE_JOULE = "joule";
   private static final String DEVICE_RPI3 = "rpi3";
-  private static final String DEVICE_NXP = "imx6ul";
+  private static final String DEVICE_PICO = "imx6ul_pico";
+  private static final String DEVICE_VVDN = "imx6ul_iopb";
   private static String sBoardVariant = "";
 
   /**
@@ -28,13 +30,32 @@ public class BoardDefaults {
         return "GP45";
       case DEVICE_RPI3:
         return "BCM6";
-      case DEVICE_NXP:
-        return "GPIO4_IO21";
+
       default:
         throw new IllegalStateException("Unknown Build.DEVICE " + Build.DEVICE);
     }
   }
-
+  /**
+   * Return the preferred I2C port for each board.
+   */
+  public static String getI2CPort() {
+    switch (getBoardVariant()) {
+      case DEVICE_EDISON_ARDUINO:
+        return "I2C6";
+      case DEVICE_EDISON:
+        return "I2C1";
+      case DEVICE_JOULE:
+        return "I2C0";
+      case DEVICE_RPI3:
+        return "I2C1";
+      case DEVICE_PICO:
+        return "I2C2";
+      case DEVICE_VVDN:
+        return "I2C4";
+      default:
+        throw new IllegalStateException("Unknown Build.DEVICE " + Build.DEVICE);
+    }
+  }
   /**
    * Return the GPIO pin that the Button is connected on.
    */
@@ -46,8 +67,7 @@ public class BoardDefaults {
         return "GP44";
       case DEVICE_RPI3:
         return "BCM21";
-      case DEVICE_NXP:
-        return "GPIO4_IO20";
+
       default:
         throw new IllegalStateException("Unknown Build.DEVICE " + Build.DEVICE);
     }
